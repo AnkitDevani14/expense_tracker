@@ -126,11 +126,11 @@ function ExpensesPage({
     }
   };
   return (
-    <Box sx={{ mx: 'auto', px: 0, py: { xs: 2, sm: 4, md: 5 }, maxWidth: 1400 }}>
-      <Grid container spacing={{ xs: 3, md: 4 }} alignItems="flex-start" wrap="nowrap">
+    <Box sx={{ mx: 'auto', px: { xs: 0.5, sm: 2, md: 0 }, py: { xs: 1, sm: 3, md: 5 }, maxWidth: { xs: '100vw', md: 1400 } }}>
+      <Grid container spacing={{ xs: 2, md: 4 }} alignItems="flex-start" wrap={{ xs: 'wrap', md: 'nowrap' }}>
         {/* Sidebar: Summary + Add Form */}
-        <Grid item xs={12} md={4} sx={{ minWidth: 0, minHeight: '80vh', display: 'flex' }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, bgcolor: '#f7fafd', borderRadius: 4, width: '100%', boxShadow: 3, p: 2.5, justifyContent: 'flex-start' }}>
+        <Grid item xs={12} md={3} sx={{ minWidth: 0, minHeight: { xs: 'auto', md: '80vh' }, display: 'flex' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, md: 2 }, bgcolor: '#f7fafd', borderRadius: 4, width: '100%', boxShadow: 3, p: { xs: 1.5, md: 2.5 }, justifyContent: 'flex-start' }}>
             <Summary total={total} />
             <Box sx={{ mt: 1 }}>
               <ExpenseForm onAdd={addExpense} categories={categories} />
@@ -138,9 +138,9 @@ function ExpensesPage({
           </Box>
         </Grid>
         {/* Main: Filter + List */}
-        <Grid item xs={14} md={8} sx={{ minWidth: 0, minHeight: '80vh', display: 'flex' }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, bgcolor: '#fff', borderRadius: 4, width: '100%', boxShadow: 2, p: 3 }}>
-            <Box sx={{ maxWidth: 900, width: '100%', mb: 2, alignSelf: 'center' }}>
+        <Grid item xs={12} md={9} sx={{ minWidth: 0, minHeight: { xs: 'auto', md: '80vh' }, display: 'flex' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, md: 2.5 }, bgcolor: '#fff', borderRadius: 4, width: '100%', boxShadow: 2, p: { xs: 1.5, md: 3 } }}>
+            <Box sx={{ maxWidth: { xs: '100%', md: 900 }, width: '100%', mb: 2, alignSelf: 'center' }}>
               <FilterBar filter={filter} setFilter={setFilter} categories={categories} />
             </Box>
             <ExportData expenses={filteredExpenses} onImport={handleImport} />
