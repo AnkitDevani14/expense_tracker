@@ -48,6 +48,9 @@ import MenuIcon from '@mui/icons-material/Menu';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useState as useReactState } from "react";
 import CategoriesPage from "./components/CategoriesPage";
+import Snackbar from "@mui/material/Snackbar";
+import Alert from "@mui/material/Alert";
+import Typography from "@mui/material/Typography";
 
 function AppRoutes(props) {
   const {
@@ -175,6 +178,9 @@ function App() {
   });
   const [sort, setSort] = useState({ field: 'date', dir: 'desc' });
   const [primaryColor, setPrimaryColor] = useState(() => localStorage.getItem('primaryColor') || '#1976d2');
+  const [error, setError] = useState(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
+  
   const theme = createTheme({
     palette: {
       mode: darkMode ? 'dark' : 'light',
@@ -198,42 +204,130 @@ function App() {
 
   // Listen for auth state changes
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsub = onAuthStateChanged(auth, (u) => {
+      console.log("Auth state changed:", u ? "User signed in" : "User signed out");
+      setUser(u);
+      setAuthInitialized(true);
+      if (!u) {
+        // Clear data when user signs out
+        setExpenses([]);
+        setCategories(DEFAULT_CATEGORIES.map(name => ({ name, id: name, default: true })));
+        setLoading(false);
+        setError(null);
+      }
+    }, (error) => {
+      console.error("Auth state change error:", error);
+      setError("Authentication error. Please try signing in again.");
+      setAuthInitialized(true);
+    });
     return () => unsub();
   }, []);
 
-  // Load from Firestore on mount
+  const DEFAULT_CATEGORIES = ["Food", "Transport", "Shopping", "Bills", "Other"];
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES.map(name => ({ name, id: name, default: true })));
+
+  // Load from Firestore only after user is authenticated
   useEffect(() => {
-    if (!user) {
-      setExpenses([]);
-      setLoading(false);
+    if (!authInitialized || !user) {
+      if (authInitialized && !user) {
+        setLoading(false);
+      }
       return;
     }
-    const fetchExpenses = async () => {
-      setLoading(true);
-      const q = query(collection(db, "expenses"), orderBy("date", "desc"));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setExpenses(data.filter(e => e.uid === user.uid));
-      setLoading(false);
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log("Fetching data for user:", user.uid);
+        
+        // Fetch expenses
+        const expensesQuery = query(
+          collection(db, "expenses"), 
+          where("uid", "==", user.uid),
+          orderBy("date", "desc")
+        );
+        const expensesSnapshot = await getDocs(expensesQuery);
+        const expensesData = expensesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        setExpenses(expensesData);
+        console.log("Fetched expenses:", expensesData.length);
+        
+        // Fetch categories
+        const categoriesQuery = query(
+          collection(db, "categories"), 
+          where("uid", "==", user.uid), 
+          orderBy("name")
+        );
+        const categoriesSnapshot = await getDocs(categoriesQuery);
+        const categoriesData = categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setCategories(categoriesData.length ? categoriesData : DEFAULT_CATEGORIES.map(name => ({ name, id: name, default: true })));
+        console.log("Fetched categories:", categoriesData.length);
+        
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        if (err.code === 'permission-denied') {
+          setError("Permission denied. Please make sure you're signed in and try again.");
+        } else if (err.code === 'unavailable') {
+          setError("Service temporarily unavailable. Please try again later.");
+        } else {
+          setError(`Failed to load data: ${err.message}`);
+        }
+        // Fallback to default categories if categories fetch fails
+        setCategories(DEFAULT_CATEGORIES.map(name => ({ name, id: name, default: true })));
+      } finally {
+        setLoading(false);
+      }
     };
-    fetchExpenses();
-  }, [user]);
+
+    fetchData();
+  }, [user, authInitialized]);
 
   // Add expense to Firestore
   const addExpense = async (expense) => {
     if (!user) return;
-    const docRef = await addDoc(collection(db, "expenses"), { ...expense, uid: user.uid });
-    setExpenses((prev) => [
-      { ...expense, id: docRef.id, uid: user.uid },
-      ...prev,
-    ]);
+    
+    try {
+      setError(null);
+      const expenseData = { 
+        ...expense, 
+        uid: user.uid,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      console.log("Adding expense:", expenseData);
+      const docRef = await addDoc(collection(db, "expenses"), expenseData);
+      const newExpense = { ...expenseData, id: docRef.id };
+      
+      setExpenses((prev) => [newExpense, ...prev]);
+      console.log("Expense added successfully:", newExpense.id);
+    } catch (err) {
+      console.error("Error adding expense:", err);
+      if (err.code === 'permission-denied') {
+        setError("Permission denied. Please make sure you're signed in and try again.");
+      } else {
+        setError(`Failed to add expense: ${err.message}`);
+      }
+    }
   };
 
   // Delete expense from Firestore
   const deleteExpense = async (id) => {
-    await deleteDoc(doc(db, "expenses", id));
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
+    try {
+      setError(null);
+      console.log("Deleting expense:", id);
+      await deleteDoc(doc(db, "expenses", id));
+      setExpenses((prev) => prev.filter((e) => e.id !== id));
+      console.log("Expense deleted successfully:", id);
+    } catch (err) {
+      console.error("Error deleting expense:", err);
+      if (err.code === 'permission-denied') {
+        setError("Permission denied. Please make sure you're signed in and try again.");
+      } else {
+        setError(`Failed to delete expense: ${err.message}`);
+      }
+    }
   };
 
   // Edit logic
@@ -241,15 +335,35 @@ function App() {
     setEditExpense(expense);
     setEditForm({ ...expense });
   };
+  
   const handleEditChange = (e) => {
     setEditForm({ ...editForm, [e.target.name]: e.target.value });
   };
+  
   const handleEditSave = async () => {
-    await updateDoc(doc(db, "expenses", editExpense.id), editForm);
-    setExpenses((prev) => prev.map((e) => (e.id === editExpense.id ? { ...editForm, id: e.id } : e)));
-    setEditExpense(null);
-    setEditForm(null);
+    try {
+      setError(null);
+      const updatedData = { 
+        ...editForm, 
+        updatedAt: new Date().toISOString() 
+      };
+      
+      console.log("Updating expense:", editExpense.id, updatedData);
+      await updateDoc(doc(db, "expenses", editExpense.id), updatedData);
+      setExpenses((prev) => prev.map((e) => (e.id === editExpense.id ? { ...updatedData, id: e.id } : e)));
+      setEditExpense(null);
+      setEditForm(null);
+      console.log("Expense updated successfully:", editExpense.id);
+    } catch (err) {
+      console.error("Error updating expense:", err);
+      if (err.code === 'permission-denied') {
+        setError("Permission denied. Please make sure you're signed in and try again.");
+      } else {
+        setError(`Failed to update expense: ${err.message}`);
+      }
+    }
   };
+  
   const handleEditCancel = () => {
     setEditExpense(null);
     setEditForm(null);
@@ -265,6 +379,7 @@ function App() {
     if (filter.to && e.date > filter.to) return false;
     return true;
   });
+  
   // Sort by selected field/dir
   filteredExpenses = [...filteredExpenses].sort((a, b) => {
     if (sort.field === 'date') {
@@ -281,34 +396,40 @@ function App() {
 
   const total = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
-  const DEFAULT_CATEGORIES = ["Food", "Transport", "Shopping", "Bills", "Other"];
-  const [categories, setCategories] = useState(DEFAULT_CATEGORIES.map(name => ({ name, id: name, default: true })));
-
   const fetchCategories = async (uid) => {
-    const q = query(collection(db, "categories"), where("uid", "==", uid), orderBy("name"));
-    const snapshot = await getDocs(q);
-    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    setCategories(data.length ? data : DEFAULT_CATEGORIES.map(name => ({ name, id: name, default: true })));
+    try {
+      setError(null);
+      console.log("Fetching categories for user:", uid);
+      const q = query(collection(db, "categories"), where("uid", "==", uid), orderBy("name"));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCategories(data.length ? data : DEFAULT_CATEGORIES.map(name => ({ name, id: name, default: true })));
+      console.log("Categories fetched successfully:", data.length);
+    } catch (err) {
+      console.error("Error fetching categories:", err);
+      if (err.code === 'permission-denied') {
+        setError("Permission denied. Please make sure you're signed in and try again.");
+      } else {
+        setError(`Failed to load categories: ${err.message}`);
+      }
+    }
   };
 
-  useEffect(() => {
-    if (!user) {
-      setExpenses([]);
-      setCategories(DEFAULT_CATEGORIES.map(name => ({ name, id: name, default: true })));
-      setLoading(false);
-      return;
-    }
-    const fetchExpenses = async () => {
-      setLoading(true);
-      const q = query(collection(db, "expenses"), orderBy("date", "desc"));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setExpenses(data.filter(e => e.uid === user.uid));
-      setLoading(false);
-    };
-    fetchExpenses();
-    fetchCategories(user.uid);
-  }, [user]);
+  const handleCloseError = () => {
+    setError(null);
+  };
+
+  // Don't render anything until auth is initialized
+  if (!authInitialized) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          <Typography>Loading...</Typography>
+        </Box>
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider theme={theme}>
@@ -347,6 +468,18 @@ function App() {
         primaryColor={primaryColor}
         setPrimaryColor={setPrimaryColor}
       />
+      
+      {/* Error Snackbar */}
+      <Snackbar 
+        open={!!error} 
+        autoHideDuration={6000} 
+        onClose={handleCloseError}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseError} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
     </ThemeProvider>
   );
 }

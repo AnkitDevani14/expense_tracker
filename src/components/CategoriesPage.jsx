@@ -31,18 +31,30 @@ const CategoriesPage = ({ user, categories, onCategoriesChange }) => {
   const handleAdd = async () => {
     if (!newCat.trim()) return;
     setLoading(true);
-    await addDoc(collection(db, "categories"), { name: newCat.trim(), uid: user.uid });
-    setNewCat("");
-    if (onCategoriesChange) await onCategoriesChange();
-    setLoading(false);
+    try {
+      await addDoc(collection(db, "categories"), { name: newCat.trim(), uid: user.uid });
+      setNewCat("");
+      if (onCategoriesChange) await onCategoriesChange();
+    } catch (err) {
+      console.error("Error adding category:", err);
+      // You could add a toast notification here for better UX
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (cat) => {
     if (cat.default) return;
     setLoading(true);
-    await deleteDoc(doc(db, "categories", cat.id));
-    if (onCategoriesChange) await onCategoriesChange();
-    setLoading(false);
+    try {
+      await deleteDoc(doc(db, "categories", cat.id));
+      if (onCategoriesChange) await onCategoriesChange();
+    } catch (err) {
+      console.error("Error deleting category:", err);
+      // You could add a toast notification here for better UX
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEdit = (cat) => {
@@ -54,12 +66,18 @@ const CategoriesPage = ({ user, categories, onCategoriesChange }) => {
   const handleEditSave = async () => {
     if (!editValue.trim() || editCat.default) return;
     setLoading(true);
-    await updateDoc(doc(db, "categories", editCat.id), { name: editValue.trim() });
-    if (onCategoriesChange) await onCategoriesChange();
-    setDialogOpen(false);
-    setEditCat(null);
-    setEditValue("");
-    setLoading(false);
+    try {
+      await updateDoc(doc(db, "categories", editCat.id), { name: editValue.trim() });
+      if (onCategoriesChange) await onCategoriesChange();
+    } catch (err) {
+      console.error("Error updating category:", err);
+      // You could add a toast notification here for better UX
+    } finally {
+      setDialogOpen(false);
+      setEditCat(null);
+      setEditValue("");
+      setLoading(false);
+    }
   };
 
   return (
