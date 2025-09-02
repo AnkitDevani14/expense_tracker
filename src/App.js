@@ -6,6 +6,7 @@ import ExpenseForm from "./components/ExpenseForm";
 import ExpenseList from "./components/ExpenseList";
 import Summary from "./components/Summary";
 import { db, auth } from "./firebase";
+import { trackAuth, trackExpense, trackError, initializeGTM } from "./utils/gtm";
 import {
   collection,
   addDoc,
@@ -180,6 +181,11 @@ function App() {
   const [primaryColor, setPrimaryColor] = useState(() => localStorage.getItem('primaryColor') || '#1976d2');
   const [error, setError] = useState(null);
   const [authInitialized, setAuthInitialized] = useState(false);
+
+  // Initialize GTM
+  useEffect(() => {
+    initializeGTM();
+  }, []);
   
   const theme = createTheme({
     palette: {
@@ -206,6 +212,14 @@ function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       console.log("Auth state changed:", u ? "User signed in" : "User signed out");
+      
+      // Track authentication events
+      if (u && !user) {
+        trackAuth('login', 'firebase');
+      } else if (!u && user) {
+        trackAuth('logout', 'firebase');
+      }
+      
       setUser(u);
       setAuthInitialized(true);
       if (!u) {
@@ -217,11 +231,12 @@ function App() {
       }
     }, (error) => {
       console.error("Auth state change error:", error);
+      trackError('auth_error', error.message, 'auth_state_change');
       setError("Authentication error. Please try signing in again.");
       setAuthInitialized(true);
     });
     return () => unsub();
-  }, []);
+  }, [user]);
 
   const DEFAULT_CATEGORIES = ["Food", "Transport", "Shopping", "Bills", "Other"];
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES.map(name => ({ name, id: name, default: true })));
@@ -302,8 +317,12 @@ function App() {
       
       setExpenses((prev) => [newExpense, ...prev]);
       console.log("Expense added successfully:", newExpense.id);
+      
+      // Track expense addition
+      trackExpense('add', expenseData);
     } catch (err) {
       console.error("Error adding expense:", err);
+      trackError('expense_add_error', err.message, 'add_expense');
       if (err.code === 'permission-denied') {
         setError("Permission denied. Please make sure you're signed in and try again.");
       } else {
@@ -317,11 +336,21 @@ function App() {
     try {
       setError(null);
       console.log("Deleting expense:", id);
+      
+      // Find the expense to track before deletion
+      const expenseToDelete = expenses.find(e => e.id === id);
+      
       await deleteDoc(doc(db, "expenses", id));
       setExpenses((prev) => prev.filter((e) => e.id !== id));
       console.log("Expense deleted successfully:", id);
+      
+      // Track expense deletion
+      if (expenseToDelete) {
+        trackExpense('delete', expenseToDelete);
+      }
     } catch (err) {
       console.error("Error deleting expense:", err);
+      trackError('expense_delete_error', err.message, 'delete_expense');
       if (err.code === 'permission-denied') {
         setError("Permission denied. Please make sure you're signed in and try again.");
       } else {
@@ -354,8 +383,12 @@ function App() {
       setEditExpense(null);
       setEditForm(null);
       console.log("Expense updated successfully:", editExpense.id);
+      
+      // Track expense edit
+      trackExpense('edit', updatedData);
     } catch (err) {
       console.error("Error updating expense:", err);
+      trackError('expense_edit_error', err.message, 'edit_expense');
       if (err.code === 'permission-denied') {
         setError("Permission denied. Please make sure you're signed in and try again.");
       } else {
@@ -418,6 +451,13 @@ function App() {
   const handleCloseError = () => {
     setError(null);
   };
+
+  // Track errors when they occur
+  useEffect(() => {
+    if (error) {
+      trackError('app_error', error, 'app_component');
+    }
+  }, [error]);
 
   // Don't render anything until auth is initialized
   if (!authInitialized) {
