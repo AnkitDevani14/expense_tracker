@@ -4,7 +4,6 @@ import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
-import AuthMenu from "./AuthMenu";
 import Switch from '@mui/material/Switch';
 import Tooltip from '@mui/material/Tooltip';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -36,21 +35,19 @@ const Header = ({ user, setUser, showSignIn, setShowSignIn, darkMode, onToggleDa
             Expense Tracker
           </Typography>
         </Box>
-        {user && (
-          <Box sx={{ ml: 4, display: { xs: 'none', sm: 'flex' }, gap: 1 }}>
-            {navItems.map((item) => (
-              <Button
-                key={item.path}
-                color={location.pathname === item.path ? 'secondary' : 'inherit'}
-                variant={location.pathname === item.path ? 'contained' : 'text'}
-                onClick={() => navigate(item.path)}
-                sx={{ fontWeight: 600, borderRadius: 2, px: 2 }}
-              >
-                {item.label}
-              </Button>
-            ))}
-          </Box>
-        )}
+        <Box sx={{ ml: 4, display: { xs: 'none', sm: 'flex' }, gap: 1 }}>
+          {navItems.map((item) => (
+            <Button
+              key={item.path}
+              color={location.pathname === item.path ? 'secondary' : 'inherit'}
+              variant={location.pathname === item.path ? 'contained' : 'text'}
+              onClick={() => navigate(item.path)}
+              sx={{ fontWeight: 600, borderRadius: 2, px: 2 }}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </Box>
         <Box sx={{ flexGrow: 1 }} />
         <Tooltip title="Pick theme color">
           <IconButton
@@ -70,7 +67,7 @@ const Header = ({ user, setUser, showSignIn, setShowSignIn, darkMode, onToggleDa
         <Tooltip title={darkMode ? "Switch to light mode" : "Switch to dark mode"}>
           <Switch checked={darkMode} onChange={onToggleDarkMode} color="default" />
         </Tooltip>
-        <AuthMenu user={user} setUser={setUser} showSignIn={showSignIn} setShowSignIn={setShowSignIn} />
+        {/* Login functionality removed: no auth menu */}
       </Toolbar>
     </AppBar>
   );

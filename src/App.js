@@ -26,8 +26,8 @@ import Button from "@mui/material/Button";
 import ExpenseFormFields from "./components/ExpenseFormFields";
 import FilterBar from "./components/FilterBar";
 import ExportData from "./components/ExportData";
-import { onAuthStateChanged } from "firebase/auth";
-import Home from "./components/Home";
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+// Home removed; app no longer gates behind login
 import PaginationBar from "./components/PaginationBar";
 import Dashboard from "./components/Dashboard";
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from "react-router-dom";
@@ -55,7 +55,7 @@ import Typography from "@mui/material/Typography";
 
 function AppRoutes(props) {
   const {
-    user, setUser, showSignIn, setShowSignIn, darkMode, handleToggleDarkMode,
+    user, setUser, darkMode, handleToggleDarkMode,
     expenses, editExpense, editForm, handleEdit, handleEditChange, handleEditSave, handleEditCancel,
     filteredExpenses, paginatedExpenses, page, setPage, pageSize, setPageSize, totalCount,
     addExpense, deleteExpense, loading, filter, setFilter, total, categories, onCategoriesChange,
@@ -66,45 +66,39 @@ function AppRoutes(props) {
       <Header
         user={user}
         setUser={setUser}
-        showSignIn={showSignIn}
-        setShowSignIn={setShowSignIn}
         darkMode={darkMode}
         onToggleDarkMode={handleToggleDarkMode}
         primaryColor={primaryColor}
         setPrimaryColor={setPrimaryColor}
       />
-      {!user ? (
-        <Home onSignIn={() => setShowSignIn(true)} />
-      ) : (
-        <Routes>
-          <Route path="/dashboard" element={<Dashboard expenses={expenses} user={user} />} />
-          <Route path="/categories" element={<CategoriesPage user={user} categories={categories} onCategoriesChange={onCategoriesChange} />} />
-          <Route path="/expenses" element={
-            <ExpensesPage
-              user={user}
-              expenses={expenses}
-              addExpense={addExpense}
-              deleteExpense={deleteExpense}
-              handleEdit={handleEdit}
-              loading={loading}
-              filter={filter}
-              setFilter={setFilter}
-              filteredExpenses={filteredExpenses}
-              paginatedExpenses={paginatedExpenses}
-              total={total}
-              page={page}
-              setPage={setPage}
-              pageSize={pageSize}
-              setPageSize={setPageSize}
-              totalCount={totalCount}
-              categories={categories}
-              sort={sort}
-              setSort={setSort}
-            />
-          } />
-          <Route path="*" element={<Navigate to="/dashboard" />} />
-        </Routes>
-      )}
+      <Routes>
+        <Route path="/dashboard" element={<Dashboard expenses={expenses} user={user} />} />
+        <Route path="/categories" element={<CategoriesPage user={user} categories={categories} onCategoriesChange={onCategoriesChange} />} />
+        <Route path="/expenses" element={
+          <ExpensesPage
+            user={user}
+            expenses={expenses}
+            addExpense={addExpense}
+            deleteExpense={deleteExpense}
+            handleEdit={handleEdit}
+            loading={loading}
+            filter={filter}
+            setFilter={setFilter}
+            filteredExpenses={filteredExpenses}
+            paginatedExpenses={paginatedExpenses}
+            total={total}
+            page={page}
+            setPage={setPage}
+            pageSize={pageSize}
+            setPageSize={setPageSize}
+            totalCount={totalCount}
+            categories={categories}
+            sort={sort}
+            setSort={setSort}
+          />
+        } />
+        <Route path="*" element={<Navigate to="/dashboard" />} />
+      </Routes>
       <Dialog open={!!editExpense} onClose={handleEditCancel}>
         <DialogTitle>Edit Expense</DialogTitle>
         <DialogContent>
@@ -170,7 +164,7 @@ function App() {
   const [editForm, setEditForm] = useState(null);
   const [filter, setFilter] = useState({ search: "", category: "", min: "", max: "", from: "", to: "" });
   const [user, setUser] = useState(null);
-  const [showSignIn, setShowSignIn] = useState(false);
+  // Login UI removed
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [darkMode, setDarkMode] = useReactState(() => {
@@ -208,8 +202,14 @@ function App() {
     });
   };
 
-  // Listen for auth state changes
+  // Listen for auth state changes and ensure anonymous session
   useEffect(() => {
+    if (!auth.currentUser) {
+      signInAnonymously(auth).catch((e) => {
+        console.error("Anonymous sign-in failed:", e);
+        setError("Unable to initialize session.");
+      });
+    }
     const unsub = onAuthStateChanged(auth, (u) => {
       console.log("Auth state changed:", u ? "User signed in" : "User signed out");
       
@@ -477,8 +477,6 @@ function App() {
       <AppRoutes
         user={user}
         setUser={setUser}
-        showSignIn={showSignIn}
-        setShowSignIn={setShowSignIn}
         darkMode={darkMode}
         handleToggleDarkMode={handleToggleDarkMode}
         expenses={expenses}

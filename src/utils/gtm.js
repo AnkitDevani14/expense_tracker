@@ -140,3 +140,4 @@ export const initializeGTM = () => {
     window.dataLayer = window.dataLayer || [];
   }
 };
+

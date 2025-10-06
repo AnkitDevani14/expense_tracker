@@ -117,3 +117,4 @@ To test your GTM setup:
 2. Verify GTM container is published
 3. Use GTM Preview mode for debugging
 4. Check network requests to GTM endpoints
+
